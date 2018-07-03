@@ -144,3 +144,12 @@ config SND_PXA2XX_SOC_IMOTE2
        help
          Say Y if you want to add support for SoC audio on the
 	 IMote 2.
+
+config SND_PXA2XX_SOC_GSM6323
+	tristate "SoC Audio support for RoverPC E5/Amoi E860"
+	depends on SND_PXA2XX_SOC && MACH_GSM6323
+	select SND_PXA2XX_SOC_AC97
+	select SND_SOC_WM9713
+	help
+	  Say Y if you want to add support for SoC audio on the
+	  GSM6323

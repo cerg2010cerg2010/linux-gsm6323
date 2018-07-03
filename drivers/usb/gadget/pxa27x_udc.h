@@ -412,8 +412,13 @@ struct udc_stats {
 	unsigned long	irqs_reconfig;
 };
 
+#ifdef CONFIG_USB_ANDROID
+#define NR_USB_ENDPOINTS (1 + 4)
+#define NR_PXA_ENDPOINTS (1 + 4)
+#else
 #define NR_USB_ENDPOINTS (1 + 5)	/* ep0 + ep1in-bulk + .. + ep3in-iso */
 #define NR_PXA_ENDPOINTS (1 + 14)	/* ep0 + epA + epB + .. + epX */
+#endif
 
 /**
  * struct pxa_udc - udc structure

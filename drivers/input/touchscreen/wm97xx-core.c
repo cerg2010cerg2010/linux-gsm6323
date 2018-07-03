@@ -53,6 +53,8 @@
 #define WM_CORE_VERSION		"1.00"
 #define DEFAULT_PRESSURE	0xb0c0
 
+// Inverts the touchscreen
+#define ANDROID_INV
 
 /*
  * Touchscreen absolute values
@@ -297,6 +299,7 @@ static void wm97xx_pen_irq_worker(struct work_struct *work)
 		status = wm97xx_reg_read(wm, AC97_GPIO_STATUS);
 		pol = wm97xx_reg_read(wm, AC97_GPIO_POLARITY);
 
+		mdelay(10);
 		if (WM97XX_GPIO_13 & pol & status) {
 			wm->pen_is_down = 1;
 			wm97xx_reg_write(wm, AC97_GPIO_POLARITY, pol &
@@ -430,8 +433,13 @@ static int wm97xx_read_samples(struct wm97xx *wm)
 			"pen down: x=%x:%d, y=%x:%d, pressure=%x:%d\n",
 			data.x >> 12, data.x & 0xfff, data.y >> 12,
 			data.y & 0xfff, data.p >> 12, data.p & 0xfff);
+#ifdef ANDROID_INV
+		input_report_abs(wm->input_dev, ABS_X, abs_x[0] + abs_x[1] - (data.x & 0xfff));
+		input_report_abs(wm->input_dev, ABS_Y, abs_y[0] + abs_y[1] - (data.y & 0xfff));
+#else
 		input_report_abs(wm->input_dev, ABS_X, data.x & 0xfff);
 		input_report_abs(wm->input_dev, ABS_Y, data.y & 0xfff);
+#endif
 		input_report_abs(wm->input_dev, ABS_PRESSURE, data.p & 0xfff);
 		input_report_key(wm->input_dev, BTN_TOUCH, 1);
 		input_sync(wm->input_dev);

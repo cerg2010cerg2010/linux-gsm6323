@@ -369,7 +369,7 @@ static int da9030_battery_get_property(struct power_supply *psy,
 		val->strval = charger->battery_info->name;
 		break;
 	default:
-		break;
+		return -EINVAL;
 	}
 
 	return 0;
@@ -489,10 +489,73 @@ static int da9030_battery_charger_init(struct da9030_charger *charger)
 			    DA9030_ADC_AUTO_SLEEP_ENABLE);
 }
 
+static ssize_t da9030_battery_show_vol(struct device *dev,
+	struct device_attribute *attr, char *buf) {
+
+	struct power_supply *psy = dev_get_drvdata(dev);
+	struct da9030_charger *charger =
+		container_of(psy, struct da9030_charger, psy);
+	int ret = 0;
+
+	ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%d\n",
+			da9030_reg_to_mV(charger->adc.vbat_res));
+	return ret;
+}
+
+static ssize_t da9030_battery_show_temp(struct device *dev,
+	struct device_attribute *attr, char *buf) {
+
+	int ret = 0;
+
+	ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%d\n",
+			285 /* not supported*/ );
+	return ret;
+}
+
+static ssize_t da9030_battery_show_capacity(struct device *dev,
+	struct device_attribute *attr, char *buf) {
+
+	struct power_supply *psy = dev_get_drvdata(dev);
+	struct da9030_charger *charger =
+		container_of(psy, struct da9030_charger, psy);
+	int ret = 0;
+	int capacity = 	((da9030_reg_to_mV(charger->adc.vbat_res) * 1000 -
+			charger->battery_info->voltage_min_design) * 100L) /
+			(charger->battery_info->voltage_max_design -
+			 charger->battery_info->voltage_min_design);
+
+	if (capacity > 100)
+		capacity = 100;
+	else if (capacity < 0)
+		capacity = 0;
+
+	ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%d\n",
+			 capacity);
+	return ret;
+}
+
+static ssize_t da9030_battery_show_present(struct device *dev,
+	struct device_attribute *attr, char *buf) {
+
+	int ret = 0;
+
+	ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%d\n",
+			1 /* not supported */);
+	return ret;
+}
+
+static struct device_attribute da9030_htc_batt_attrs[] = {
+	__ATTR(batt_vol, S_IRUGO, da9030_battery_show_vol, NULL),
+	__ATTR(batt_temp, S_IRUGO, da9030_battery_show_temp, NULL),
+	__ATTR(capacity, S_IRUGO, da9030_battery_show_capacity, NULL),
+	__ATTR(present, S_IRUGO, da9030_battery_show_present, NULL),
+};
+
 static int da9030_battery_probe(struct platform_device *pdev)
 {
 	struct da9030_charger *charger;
 	struct da9030_battery_info *pdata = pdev->dev.platform_data;
+	int i;
 	int ret;
 
 	if (pdata == NULL)
@@ -545,7 +608,19 @@ static int da9030_battery_probe(struct platform_device *pdev)
 
 	charger->debug_file = da9030_bat_create_debugfs(charger);
 	platform_set_drvdata(pdev, charger);
+
+	for (i = 0; i < ARRAY_SIZE(da9030_htc_batt_attrs); i++) {
+		ret = device_create_file(charger->psy.dev,
+				&da9030_htc_batt_attrs[i]);
+		if (ret)
+			goto htc_attrs_failed;
+	}
+
 	return 0;
+
+htc_attrs_failed:
+	while (i--)
+		device_remove_file(charger->psy.dev, &da9030_htc_batt_attrs[i]);
 
 err_ps_register:
 	da903x_unregister_notifier(charger->master, &charger->nb,

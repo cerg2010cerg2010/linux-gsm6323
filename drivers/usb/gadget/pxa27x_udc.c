@@ -2362,13 +2362,24 @@ static struct pxa_udc memory = {
 		USB_EP_CTRL,
 		USB_EP_OUT_BULK(1),
 		USB_EP_IN_BULK(2),
+#ifdef CONFIG_USB_ANDROID
+		USB_EP_OUT_BULK(3),
+		USB_EP_IN_BULK(4),
+#else
 		USB_EP_IN_ISO(3),
 		USB_EP_OUT_ISO(4),
 		USB_EP_IN_INT(5),
+#endif
 	},
 
 	.pxa_ep = {
 		PXA_EP_CTRL,
+#ifdef CONFIG_USB_ANDROID
+		PXA_EP_OUT_BULK(1, 1, 1, 0, 0),
+		PXA_EP_IN_BULK(2, 2, 1, 0, 0),
+		PXA_EP_OUT_BULK(3, 3, 1, 0, 0),
+		PXA_EP_IN_BULK(4, 4, 1, 0, 0),
+#else
 		/* Endpoints for gadget zero */
 		PXA_EP_OUT_BULK(1, 1, 3, 0, 0),
 		PXA_EP_IN_BULK(2,  2, 3, 0, 0),
@@ -2392,6 +2403,7 @@ static struct pxa_udc memory = {
 		/* Endpoint for CDC Ether */
 		PXA_EP_OUT_BULK(13, 1, 1, 1, 1),
 		PXA_EP_IN_BULK(14,  2, 1, 1, 1),
+#endif
 	}
 };
 

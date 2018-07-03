@@ -254,6 +254,12 @@ config MACH_TRIZEPS4WL
 	select PXA27x
 	select PXA_SSP
 
+config MACH_GSM6323
+	bool "RoverPC E5/Amoi E860 Support"
+	select IWMMXT
+	select PXA27x
+	select PXA_SSP
+
 choice
 	prompt "Select base board for Trizeps module"
 	depends on TRIZEPS_PXA
