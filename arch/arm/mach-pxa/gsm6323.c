@@ -1,10 +1,10 @@
 /*
- * Support for GSM6323 board PDA phones:
+ * Support for GSM6323 board PDAs:
  * RoverPC E5 and Amoi E860
  *
  * Copyright (c) 2018 Sergey Larin
  *
- * Based on gsm6323.c, em-x270.c, and others.
+ * Based on em-x270.c, and others.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -97,8 +97,6 @@
 #	include "udc.h"
 #endif
 
-// #include "udc.h"
-// #include "pxa27x-udc.h"
 #include "devices.h"
 #include "generic.h"
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 35)
@@ -254,11 +252,9 @@ static unsigned long gsm6323_pin_config[] __initdata = {
 	}
 
 static struct gpio_keys_button gsm6323_button_table[] = {
-	INIT_KEY(POWER,		1,	"Power button"),
+	INIT_KEY(END,		1,	"Power button"),
 	INIT_KEY(CAMERA,	14,	"Camera button"),
 	INIT_KEY(MEDIA,		39,	"Whell press"),
-	// INIT_KEY(VOLUMEDOWN,	93,	"Wheel down"),
-	// INIT_KEY(VOLUMEUP,	94,	"Wheel up"),
 	{
 		.code			= KEY_VOLUMEDOWN,
 		.gpio			= 93,
@@ -294,14 +290,14 @@ static struct platform_device gpio_keys = {
  */
 
 static unsigned int gsm6323_matrix_keys[] = {
-	KEY(1, 0, KEY_POWER),
+	KEY(1, 0, KEY_SEND), // call
 	KEY(1, 2, KEY_LEFT),
 	KEY(1, 3, KEY_UP),
 	KEY(2, 0, KEY_HOME), // discard
 	KEY(2, 2, KEY_RIGHT),
 	KEY(2, 3, KEY_DOWN),
 	KEY(3, 0, KEY_ENTER),
-	KEY(3, 2, KEY_BACK),
+	KEY(3, 2, KEY_BACK), // don't know what original button should do...
 	KEY(3, 3, KEY_MENU),
 };
 
@@ -491,7 +487,7 @@ static struct regulator_init_data gsm6323_ldo_init_data[] = {
 	REG_INIT("vcc_bt", 1800000, 1800000),
 	REG_INIT("vcc_unk3", 2400000, 2400000),
 	REG_INIT("vcc_camgps", 3200000, 3200000),
-	//REG_INIT("vcc_lcd", 3200000, 3200000),
+	//REG_INIT("vcc_lcd", 3200000, 3200000), // cannot be enabled (why?)
 };
 
 /*
@@ -565,6 +561,8 @@ static struct da903x_subdev_info gsm6323_da9030_subdevs[] = {
 	//DA9030_LDO(11,7),
 	//DA9030_LDO(18,8),
 
+	// BUCK (first) is used originally, but only upper bits are written...
+	// maybe this is actually BUCK2, but I don't have a datasheet
 	// DA9030_SUBDEV(regulator, BUCK2, &buck2_data),
 
 	DA9030_SUBDEV(led, LED_1, &gsm6323_led_info[0]),
@@ -591,6 +589,7 @@ static struct i2c_board_info gsm6323_pwr_i2c_board_info[] __initdata = {
 /*
  * MMC/SD
  */
+// Doesn't work if I put GPIO number in plarform_data...
 static int gsm6323_mci_init(struct device *dev,
 			    irq_handler_t detect_int,
 			    void *data)
@@ -623,6 +622,15 @@ static struct pxamci_platform_data gsm6323_mci_platform_data = {
  * DiskOnChip G4 flash
  */
 
+/* The address should be correct, but driver keeps crashing...
+ * There is also StrataFlash (64MB I think) chip soldered,
+ * but it appears that it's not used, because:
+ * - ~60MB Windows Mobile firmware
+ * - ~60MB of internal memory
+ * - tiny IPL and BDTL bootloaders
+ * Everything of this fits into 128MB DOC memory.
+ * But the chip is there, on the board... IDK really!
+ */
 static struct resource gsm6323_docg4_resource = {
 	.start	= PXA_CS0_PHYS,
 	.end	= PXA_CS0_PHYS + SZ_128K - 1,
@@ -724,33 +732,98 @@ static struct platform_driver gsm6323_wm97xx_driver = {
 
 #if defined(CONFIG_USB_ANDROID) || defined(CONFIG_USB_ANDROID_MODULE)
 
-#define GOOGLE_VENDOR_ID		0x18d1
-#define GOOGLE_PRODUCT_ID		0x9018
-#define GOOGLE_ADB_PRODUCT_ID		0x9015
+static char *usb_functions_default[] = {
+	"usb_mass_storage",
+};
 
-static char *usb_functions_adb[] = {
+static char *usb_functions_default_adb[] = {
 	"adb",
+	"usb_mass_storage",
+};
+
+static char *usb_functions_rndis[] = {
+	"rndis",
+};
+
+static char *usb_functions_rndis_adb[] = {
+	"rndis",
+	"adb",
+};
+
+static char *usb_functions_all[] = {
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	"rndis",
+#endif
+	"adb",
+	"usb_mass_storage",
+#ifdef CONFIG_USB_ANDROID_ACM
+	"acm",
+#endif
 };
 
 static struct android_usb_product usb_products[] = {
 	{
-		.product_id	= GOOGLE_PRODUCT_ID,
-		.num_functions	= ARRAY_SIZE(usb_functions_adb),
-		.functions	= usb_functions_adb,
+		.product_id	= 0x9025,
+		.num_functions	= ARRAY_SIZE(usb_functions_default_adb),
+		.functions	= usb_functions_default_adb,
+	},
+	{
+		.product_id	= 0x9026,
+		.num_functions	= ARRAY_SIZE(usb_functions_default),
+		.functions	= usb_functions_default,
+	},
+	{
+		.product_id	= 0xf00e,
+		.num_functions	= ARRAY_SIZE(usb_functions_rndis),
+		.functions	= usb_functions_rndis,
+	},
+	{
+		.product_id	= 0x9024,
+		.num_functions	= ARRAY_SIZE(usb_functions_rndis_adb),
+		.functions	= usb_functions_rndis_adb,
+	},
+};
+
+static struct usb_mass_storage_platform_data mass_storage_pdata = {
+	.nluns		= 1,
+	.vendor		= "RoverPC",
+	.product        = "Mass storage",
+	.release	= 0x0100,
+};
+
+static struct platform_device gsm6323_android_usb_mass_storage_device = {
+	.name	= "usb_mass_storage",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &mass_storage_pdata,
+	},
+};
+
+static struct usb_ether_platform_data rndis_pdata = {
+	.vendorID	= 0x0bb4,
+	.vendorDescr	= "RoverPC",
+	.ethaddr	= { 0x00, 0x12, 0x40, 0x11, 0xA8, 0x2A },
+};
+
+static struct platform_device gsm6323_android_rndis_device = {
+	.name	= "rndis",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &rndis_pdata,
 	},
 };
 
 static struct android_usb_platform_data android_usb_pdata = {
-	.vendor_id	= GOOGLE_VENDOR_ID,
-	.product_id	= GOOGLE_PRODUCT_ID,
-	.functions	= usb_functions_adb,
+	.vendor_id	= 0x0bb4,
+	.product_id	= 0x0c01,
+	.functions	= usb_functions_all,
 	.num_products	= ARRAY_SIZE(usb_products),
 	.products	= usb_products,
 	.version	= 0x0100,
 	.product_name	= "Android Gadget",
 	.manufacturer_name	= "RoverPC", // You may set "AMOI"
-	.serial_number	= "1337",
-	.num_functions	= ARRAY_SIZE(usb_functions_adb),
+	.serial_number	= "1234567890ABCDEF",
+	.num_functions	= ARRAY_SIZE(usb_functions_all),
 };
 
 static struct platform_device gsm6323_android_usb_device = {
@@ -773,9 +846,20 @@ static struct platform_device *devices[] __initdata = {
 	&gsm6323_pxa_pcm,
 	&gsm6323_card,
 	// &gsm6323_docg4_flash,
+
+	/* Seems like OTG is assumed to be always-on, maybe
+	 * it needs additional configuration. Anyway, this one should
+	 * work, feel free to uncomment (don't forget ohci line below)
+	 */
 	// &gsm6323_gpio_vbus,
 #ifdef CONFIG_USB_ANDROID
 	&gsm6323_android_usb_device,
+#endif
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+	&gsm6323_android_usb_mass_storage_device,
+#endif
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	&gsm6323_android_rndis_device,
 #endif
 };
 

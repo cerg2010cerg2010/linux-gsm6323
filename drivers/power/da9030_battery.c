@@ -309,6 +309,7 @@ static enum power_supply_property da9030_battery_props[] = {
 	POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_CURRENT_AVG,
+	POWER_SUPPLY_PROP_CAPACITY,
 };
 
 static void da9030_battery_check_status(struct da9030_charger *charger,
@@ -333,6 +334,21 @@ static void da9030_battery_check_health(struct da9030_charger *charger,
 		val->intval = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
 	else
 		val->intval = POWER_SUPPLY_HEALTH_GOOD;
+}
+
+static int da9030_battery_get_capacity(struct da9030_charger *charger)
+{
+	int capacity = 	((da9030_reg_to_mV(charger->adc.vbat_res) * 1000 -
+			charger->battery_info->voltage_min_design) * 100L) /
+			(charger->battery_info->voltage_max_design -
+			 charger->battery_info->voltage_min_design);
+
+	if (capacity > 100)
+		capacity = 100;
+	else if (capacity < 0)
+		capacity = 0;
+
+	return capacity;
 }
 
 static int da9030_battery_get_property(struct power_supply *psy,
@@ -367,6 +383,9 @@ static int da9030_battery_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_MODEL_NAME:
 		val->strval = charger->battery_info->name;
+		break;
+	case POWER_SUPPLY_PROP_CAPACITY:
+		val->intval = da9030_battery_get_capacity(charger);
 		break;
 	default:
 		return -EINVAL;
@@ -512,28 +531,6 @@ static ssize_t da9030_battery_show_temp(struct device *dev,
 	return ret;
 }
 
-static ssize_t da9030_battery_show_capacity(struct device *dev,
-	struct device_attribute *attr, char *buf) {
-
-	struct power_supply *psy = dev_get_drvdata(dev);
-	struct da9030_charger *charger =
-		container_of(psy, struct da9030_charger, psy);
-	int ret = 0;
-	int capacity = 	((da9030_reg_to_mV(charger->adc.vbat_res) * 1000 -
-			charger->battery_info->voltage_min_design) * 100L) /
-			(charger->battery_info->voltage_max_design -
-			 charger->battery_info->voltage_min_design);
-
-	if (capacity > 100)
-		capacity = 100;
-	else if (capacity < 0)
-		capacity = 0;
-
-	ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%d\n",
-			 capacity);
-	return ret;
-}
-
 static ssize_t da9030_battery_show_present(struct device *dev,
 	struct device_attribute *attr, char *buf) {
 
@@ -547,7 +544,6 @@ static ssize_t da9030_battery_show_present(struct device *dev,
 static struct device_attribute da9030_htc_batt_attrs[] = {
 	__ATTR(batt_vol, S_IRUGO, da9030_battery_show_vol, NULL),
 	__ATTR(batt_temp, S_IRUGO, da9030_battery_show_temp, NULL),
-	__ATTR(capacity, S_IRUGO, da9030_battery_show_capacity, NULL),
 	__ATTR(present, S_IRUGO, da9030_battery_show_present, NULL),
 };
 
