@@ -845,7 +845,7 @@ static struct platform_device *devices[] __initdata = {
 	&gsm6323_codec,
 	&gsm6323_pxa_pcm,
 	&gsm6323_card,
-	// &gsm6323_docg4_flash,
+	&gsm6323_docg4_flash,
 
 	/* Seems like OTG is assumed to be always-on, maybe
 	 * it needs additional configuration. Anyway, this one should
