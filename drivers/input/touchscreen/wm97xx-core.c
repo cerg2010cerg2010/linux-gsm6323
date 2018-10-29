@@ -54,7 +54,7 @@
 #define DEFAULT_PRESSURE	0xb0c0
 
 // Inverts the touchscreen
-#define ANDROID_INV
+// #define ANDROID_INV
 
 /*
  * Touchscreen absolute values
