@@ -25,6 +25,10 @@
 #include <linux/kernel.h>
 #include <linux/utsname.h>
 
+/* for composite.c to work */
+#include <linux/fs.h>
+#include <linux/delay.h>
+
 #include "u_ether.h"
 
 
